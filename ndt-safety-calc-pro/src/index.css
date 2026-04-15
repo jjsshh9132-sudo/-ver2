@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@media print {
+  @page {
+    margin: 1cm;
+  }
+  body {
+    background-color: white !important;
+  }
+  aside, button, .mt-auto {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .max-w-5xl {
+    max-width: 100% !important;
+  }
+  .shadow-xl, .shadow-sm, .shadow-md {
+    box-shadow: none !important;
+  }
+  .rounded-3xl, .rounded-2xl, .rounded-xl {
+    border-radius: 0.5rem !important;
+  }
+  table {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+}
