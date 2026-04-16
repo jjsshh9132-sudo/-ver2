@@ -7,7 +7,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Settings2, 
   Calculator, 
-  FileSpreadsheet, 
+  Printer, 
   RotateCcw, 
   Plus, 
   X, 
@@ -15,11 +15,11 @@ import {
   Construction, 
   Map, 
   BrickWall,
+  ChevronRight,
   Info,
   LayoutDashboard,
   Layers
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { 
   Facility, 
   AppData, 
@@ -35,6 +35,7 @@ import {
 } from './constants';
 import { TEST_RULES, getCategory } from './rules';
 
+// 비고란에 들어갈 지침서 기반 시험 방법 맵핑
 const REMARKS_MAP: Record<string, string> = {
   'CONC_STR': '반발경도법 등',
   'CARBON': '페놀프탈레인 용액법 등',
@@ -69,34 +70,70 @@ const DEFAULT_FACILITY: Facility = {
 export default function App() {
   const [appData, setAppData] = useState<AppData>(() => {
     const saved = localStorage.getItem('safety_diag_data_v2');
-    if (saved) { try { return JSON.parse(saved); } catch (e) { console.error(e); } }
-    return { facilities: [DEFAULT_FACILITY], currentId: '1' };
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved data', e);
+      }
+    }
+    return {
+      facilities: [DEFAULT_FACILITY],
+      currentId: '1'
+    };
   });
 
-  useEffect(() => { localStorage.setItem('safety_diag_data_v2', JSON.stringify(appData)); }, [appData]);
+  useEffect(() => {
+    localStorage.setItem('safety_diag_data_v2', JSON.stringify(appData));
+  }, [appData]);
 
-  const activeFacility = useMemo(() => appData.facilities.find(f => f.id === appData.currentId) || appData.facilities[0], [appData]);
+  const activeFacility = useMemo(() => {
+    return appData.facilities.find(f => f.id === appData.currentId) || appData.facilities[0];
+  }, [appData]);
 
   const updateFacility = (updates: Partial<Facility>) => {
-    setAppData(prev => ({ ...prev, facilities: prev.facilities.map(f => f.id === prev.currentId ? { ...f, ...updates } : f) }));
+    setAppData(prev => ({
+      ...prev,
+      facilities: prev.facilities.map(f => 
+        f.id === prev.currentId ? { ...f, ...updates } : f
+      )
+    }));
   };
 
   const addFacility = () => {
     const newId = Date.now().toString();
-    const newFacility: Facility = { ...DEFAULT_FACILITY, id: newId, name: `시설물 ${appData.facilities.length + 1}`, implQtys: {} };
-    setAppData(prev => ({ facilities: [...prev.facilities, newFacility], currentId: newId }));
+    const newFacility: Facility = {
+      ...DEFAULT_FACILITY,
+      id: newId,
+      name: `시설물 ${appData.facilities.length + 1}`,
+      implQtys: {}
+    };
+    setAppData(prev => ({
+      facilities: [...prev.facilities, newFacility],
+      currentId: newId
+    }));
   };
 
   const deleteFacility = (id: string) => {
     if (appData.facilities.length <= 1) return;
-    if (!confirm('삭제하시겠습니까?')) return;
+    if (!confirm('이 시설물 데이터를 삭제하시겠습니까?')) return;
     setAppData(prev => {
       const newFacilities = prev.facilities.filter(f => f.id !== id);
-      return { facilities: newFacilities, currentId: prev.currentId === id ? newFacilities[0].id : prev.currentId };
+      return {
+        facilities: newFacilities,
+        currentId: prev.currentId === id ? newFacilities[0].id : prev.currentId
+      };
     });
   };
 
-  const resetData = () => { if (confirm('모든 데이터 초기화?')) setAppData({ facilities: [DEFAULT_FACILITY], currentId: '1' }); };
+  const resetData = () => {
+    if (confirm('모든 데이터가 초기화됩니다. 계속하시겠습니까?')) {
+      setAppData({
+        facilities: [DEFAULT_FACILITY],
+        currentId: '1'
+      });
+    }
+  };
 
   const updateSection = <T extends keyof Facility>(key: T, id: string, field: string, value: any) => {
     const list = activeFacility[key] as any[];
@@ -110,6 +147,7 @@ export default function App() {
     if (key === 'bridgeSpans') newItem = { id, type: 'STB (강박스)', spanLength: 30, spanCount: 1, girderCount: 5 };
     if (key === 'tunnelSections') newItem = { id, type: '표준단면', length: 500, concreteType: 'REINFORCED' };
     if (key === 'retainingWallSections') newItem = { id, type: 'CONCRETE', length: 100 };
+    
     updateFacility({ [key]: [...(activeFacility[key] as any[]), newItem] });
   };
 
@@ -126,40 +164,60 @@ export default function App() {
     updateFacility({ implQtys: newImplQtys });
   };
 
-  const downloadExcel = () => {
-    const tableData = TEST_RULES[activeFacility.selectedType].map(rule => {
-      const res = rule.calculate(activeFacility);
-      const valU = activeFacility.implQtys[rule.id]?.upper ?? res.upperQty;
-      const valL = activeFacility.implQtys[rule.id]?.lower ?? res.lowerQty;
-      return { '시험 항목': rule.name, '비고': REMARKS_MAP[rule.id] || '지침 기준 준수', '수량(기준)': `${res.upperQty}/${res.lowerQty}`, '수량(금회)': `${valU}/${valL}` };
-    });
-    const worksheet = XLSX.utils.json_to_sheet(tableData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, '수량산출');
-    XLSX.writeFile(workbook, `${activeFacility.name}_수량산출.xlsx`);
-  };
-
   const totalLength = useMemo(() => {
-    if (activeFacility.selectedType === 'BRIDGE') return activeFacility.bridgeSpans.reduce((acc, sp) => acc + (Number(sp.spanLength) || 0) * (Number(sp.spanCount) || 0), 0);
-    if (activeFacility.selectedType === 'TUNNEL') return activeFacility.tunnelSections.reduce((acc, sec) => acc + (Number(sec.length) || 0), 0);
+    if (activeFacility.selectedType === 'BRIDGE') {
+      return activeFacility.bridgeSpans.reduce((acc, sp) => acc + (Number(sp.spanLength) || 0) * (Number(sp.spanCount) || 0), 0);
+    }
+    if (activeFacility.selectedType === 'TUNNEL') {
+      return activeFacility.tunnelSections.reduce((acc, sec) => acc + (Number(sec.length) || 0), 0);
+    }
     return activeFacility.retainingWallSections.reduce((acc, sec) => acc + (Number(sec.length) || 0), 0);
   }, [activeFacility]);
 
-  const totalSpans = useMemo(() => activeFacility.selectedType === 'BRIDGE' ? activeFacility.bridgeSpans.reduce((acc, sp) => acc + (Number(sp.spanCount) || 0), 0) : 0, [activeFacility]);
+  const totalSpans = useMemo(() => {
+    if (activeFacility.selectedType === 'BRIDGE') {
+      return activeFacility.bridgeSpans.reduce((acc, sp) => acc + (Number(sp.spanCount) || 0), 0);
+    }
+    return 0;
+  }, [activeFacility]);
+
   const isBridge = activeFacility.selectedType === 'BRIDGE';
-  const getThemeColor = (type: StructureType) => type === 'BRIDGE' ? 'bg-blue-600' : type === 'TUNNEL' ? 'bg-emerald-600' : 'bg-orange-600';
-  const getThemeLightColor = (type: StructureType) => type === 'BRIDGE' ? 'bg-blue-50 text-blue-700 border-blue-200' : type === 'TUNNEL' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-orange-50 text-orange-700 border-orange-200';
+
+  const getThemeColor = (type: StructureType) => {
+    if (type === 'BRIDGE') return 'bg-blue-600';
+    if (type === 'TUNNEL') return 'bg-emerald-600';
+    return 'bg-orange-600';
+  };
+
+  const getThemeLightColor = (type: StructureType) => {
+    if (type === 'BRIDGE') return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (type === 'TUNNEL') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    return 'bg-orange-50 text-orange-700 border-orange-200';
+  };
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#F8FAFC] text-slate-900 antialiased font-sans overflow-hidden">
+      
+      {/* Column 1: Settings & Input (Leftmost) */}
       <aside className="w-full md:w-[300px] bg-white border-r border-slate-200 flex flex-col shrink-0 shadow-sm overflow-y-auto no-scrollbar h-screen sticky top-0 z-30 print:hidden">
         <div className={`p-5 text-white ${getThemeColor(activeFacility.selectedType)} transition-colors duration-500`}>
           <div className="flex items-center gap-3 mb-4">
-            <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm"><LayoutDashboard className="w-5 h-5 text-white" /></div>
-            <div><h2 className="text-xs font-black uppercase tracking-wider">NDT Safety Calc</h2><p className="text-[9px] font-bold opacity-80">비파괴 검사 수량 산출 프로</p></div>
+            <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm">
+              <LayoutDashboard className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xs font-black uppercase tracking-wider">NDT Safety Calc</h2>
+              <p className="text-[9px] font-bold opacity-80">비파괴 검사 수량 산출 프로</p>
+            </div>
           </div>
-          <button onClick={addFacility} className="w-full py-2.5 bg-white text-slate-900 rounded-xl text-[11px] font-black shadow-lg hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 active:scale-[0.97]"><Plus className="w-3.5 h-3.5" /> 새 시설물 추가하기</button>
+          <button 
+            onClick={addFacility}
+            className="w-full py-2.5 bg-white text-slate-900 rounded-xl text-[11px] font-black shadow-lg hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 active:scale-[0.97]"
+          >
+            <Plus className="w-3.5 h-3.5" /> 새 시설물 추가하기
+          </button>
         </div>
+
         <div className="p-4 space-y-6">
           <section>
             <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 px-1 tracking-widest">구조물 형식 변경</label>
@@ -167,8 +225,13 @@ export default function App() {
               {(Object.entries(STRUCTURE_INFO) as [StructureType, any][]).map(([key, info]) => {
                 const Icon = { Construction, Map, BrickWall }[info.icon] || Construction;
                 const isActive = activeFacility.selectedType === key;
+                const activeColor = key === 'BRIDGE' ? 'bg-blue-600' : key === 'TUNNEL' ? 'bg-emerald-600' : 'bg-orange-600';
                 return (
-                  <button key={key} onClick={() => updateFacility({ selectedType: key })} className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all active:scale-95 ${isActive ? `${getThemeColor(key)} text-white shadow-md border-transparent` : 'border-slate-50 bg-white text-slate-400 hover:border-slate-100'}`}>
+                  <button 
+                    key={key}
+                    onClick={() => updateFacility({ selectedType: key })}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all active:scale-95 ${isActive ? `${activeColor} text-white shadow-md border-transparent` : 'border-slate-50 bg-white text-slate-400 hover:border-slate-100'}`}
+                  >
                     <Icon className={`w-5 h-5 mb-1 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                     <span className="text-[9px] font-black">{info.name}</span>
                   </button>
@@ -176,21 +239,37 @@ export default function App() {
               })}
             </div>
           </section>
+
           <section className="space-y-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-            <label className="block text-[10px] font-black text-slate-500 uppercase mb-1 tracking-widest flex items-center gap-2"><Settings2 className="w-3.5 h-3.5" /> 상세 설정</label>
+            <label className="block text-[10px] font-black text-slate-500 uppercase mb-1 tracking-widest flex items-center gap-2">
+              <Settings2 className="w-3.5 h-3.5" /> 상세 설정
+            </label>
             <div>
               <label className="block text-[9px] font-black text-slate-400 uppercase mb-1 ml-0.5">점검 종류</label>
-              <select value={activeFacility.inspectionType} onChange={(e) => updateFacility({ inspectionType: e.target.value as InspectionType })} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold outline-none">
-                {Object.entries(INSPECTION_INFO).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
+              <select 
+                value={activeFacility.inspectionType}
+                onChange={(e) => updateFacility({ inspectionType: e.target.value as InspectionType })}
+                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold outline-none"
+              >
+                {Object.entries(INSPECTION_INFO).map(([k, v]) => (
+                  <option key={k} value={k}>{v.name}</option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-[9px] font-black text-slate-400 uppercase mb-1 ml-0.5">시설물 종별</label>
-              <select value={activeFacility.facilityClass} onChange={(e) => updateFacility({ facilityClass: e.target.value as FacilityClass })} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold outline-none">
-                {Object.entries(FACILITY_CLASS_INFO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              <select 
+                value={activeFacility.facilityClass}
+                onChange={(e) => updateFacility({ facilityClass: e.target.value as FacilityClass })}
+                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold outline-none"
+              >
+                {Object.entries(FACILITY_CLASS_INFO).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
               </select>
             </div>
           </section>
+
           <section className="pt-2">
             <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 px-1 tracking-widest">세부 제원 입력</label>
             <div className="space-y-3">
@@ -198,9 +277,17 @@ export default function App() {
                 <div className="space-y-2">
                   {activeFacility.bridgeSpans.map((span, i) => (
                     <div key={span.id} className="p-3 bg-white border border-slate-100 rounded-xl space-y-2 shadow-sm">
-                      <div className="flex items-center justify-between"><span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded uppercase">Span #{i+1}</span><button onClick={() => removeSection('bridgeSpans', span.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button></div>
-                      <select value={span.type} onChange={(e) => updateSection('bridgeSpans', span.id, 'type', e.target.value)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none">{BRIDGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                      <div className="grid grid-cols-2 gap-2"><div className="relative"><input type="number" value={span.spanLength} onChange={(e) => updateSection('bridgeSpans', span.id, 'spanLength', parseFloat(e.target.value) || 0)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-slate-400 font-bold">m</span></div><div className="relative"><input type="number" value={span.spanCount} onChange={(e) => updateSection('bridgeSpans', span.id, 'spanCount', parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-slate-400 font-bold">경간</span></div></div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded uppercase">Span #{i+1}</span>
+                        <button onClick={() => removeSection('bridgeSpans', span.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                      </div>
+                      <select value={span.type} onChange={(e) => updateSection('bridgeSpans', span.id, 'type', e.target.value)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none">
+                        {BRIDGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="relative"><input type="number" value={span.spanLength} onChange={(e) => updateSection('bridgeSpans', span.id, 'spanLength', parseFloat(e.target.value) || 0)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-slate-400 font-bold">m</span></div>
+                        <div className="relative"><input type="number" value={span.spanCount} onChange={(e) => updateSection('bridgeSpans', span.id, 'spanCount', parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-slate-400 font-bold">경간</span></div>
+                      </div>
                     </div>
                   ))}
                   <button onClick={() => addSection('bridgeSpans')} className="w-full py-2 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black border border-blue-100 hover:bg-blue-100 transition-all">+ 경간 그룹 추가</button>
@@ -211,7 +298,10 @@ export default function App() {
                   {activeFacility.tunnelSections.map((sec, i) => (
                     <div key={sec.id} className="p-3 bg-white border border-slate-100 rounded-xl space-y-2 shadow-sm">
                       <div className="flex items-center justify-between"><span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase">Section #{i+1}</span><button onClick={() => removeSection('tunnelSections', sec.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button></div>
-                      <div className="flex gap-1"><button onClick={() => updateSection('tunnelSections', sec.id, 'concreteType', 'REINFORCED')} className={`flex-1 py-1 rounded-lg text-[8px] font-black transition-all ${sec.concreteType === 'REINFORCED' ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-400'}`}>철근</button><button onClick={() => updateSection('tunnelSections', sec.id, 'concreteType', 'PLAIN')} className={`flex-1 py-1 rounded-lg text-[8px] font-black transition-all ${sec.concreteType === 'PLAIN' ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-400'}`}>무근</button></div>
+                      <div className="flex gap-1">
+                        <button onClick={() => updateSection('tunnelSections', sec.id, 'concreteType', 'REINFORCED')} className={`flex-1 py-1 rounded-lg text-[8px] font-black transition-all ${sec.concreteType === 'REINFORCED' ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-400'}`}>철근</button>
+                        <button onClick={() => updateSection('tunnelSections', sec.id, 'concreteType', 'PLAIN')} className={`flex-1 py-1 rounded-lg text-[8px] font-black transition-all ${sec.concreteType === 'PLAIN' ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-400'}`}>무근</button>
+                      </div>
                       <div className="relative"><input type="number" value={sec.length} onChange={(e) => updateSection('tunnelSections', sec.id, 'length', parseFloat(e.target.value) || 0)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-slate-400 font-bold">m</span></div>
                     </div>
                   ))}
@@ -223,7 +313,11 @@ export default function App() {
                   {activeFacility.retainingWallSections.map((sec, i) => (
                     <div key={sec.id} className="p-3 bg-white border border-slate-100 rounded-xl space-y-2 shadow-sm">
                       <div className="flex items-center justify-between"><span className="text-[8px] font-black text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded uppercase">Section #{i+1}</span><button onClick={() => removeSection('retainingWallSections', sec.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button></div>
-                      <div className="grid grid-cols-3 gap-1">{(['CONCRETE', 'REINFORCED_SOIL', 'STONE'] as const).map(type => (<button key={type} onClick={() => updateSection('retainingWallSections', sec.id, 'type', type)} className={`py-1 rounded-lg text-[7px] font-black transition-all ${sec.type === type ? 'bg-orange-600 text-white' : 'bg-slate-50 text-slate-400'}`}>{type === 'CONCRETE' ? '콘크리트' : type === 'REINFORCED_SOIL' ? '보강토' : '석축'}</button>))}</div>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['CONCRETE', 'REINFORCED_SOIL', 'STONE'] as const).map(type => (
+                          <button key={type} onClick={() => updateSection('retainingWallSections', sec.id, 'type', type)} className={`py-1 rounded-lg text-[7px] font-black transition-all ${sec.type === type ? 'bg-orange-600 text-white' : 'bg-slate-50 text-slate-400'}`}>{type === 'CONCRETE' ? '콘크리트' : type === 'REINFORCED_SOIL' ? '보강토' : '석축'}</button>
+                        ))}
+                      </div>
                       <div className="relative"><input type="number" value={sec.length} onChange={(e) => updateSection('retainingWallSections', sec.id, 'length', parseFloat(e.target.value) || 0)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-slate-400 font-bold">m</span></div>
                     </div>
                   ))}
@@ -236,17 +330,61 @@ export default function App() {
         <div className="mt-auto p-4 border-t border-slate-50 bg-slate-50/30"><button onClick={resetData} className="w-full py-2 text-[9px] font-black text-slate-400 hover:text-red-500 transition-all flex items-center justify-center gap-1.5"><RotateCcw className="w-3 h-3" /> 데이터 초기화</button></div>
       </aside>
 
+      {/* Column 2: Facility List Banner */}
       <div className="w-full md:w-[280px] bg-slate-50/50 border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto no-scrollbar h-screen sticky top-0 z-20 print:hidden">
-        <div className="p-4 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">시설물 목록 배너</label></div>
+        <div className="p-4 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-slate-400" />
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">시설물 목록 배너</label>
+          </div>
+        </div>
+        
         <div className="p-2 space-y-2">
           {appData.facilities.map(f => {
             const isActive = appData.currentId === f.id;
             const typeColor = f.selectedType === 'BRIDGE' ? 'bg-blue-600' : f.selectedType === 'TUNNEL' ? 'bg-emerald-600' : 'bg-orange-600';
+            const typeLight = f.selectedType === 'BRIDGE' ? 'bg-blue-50' : f.selectedType === 'TUNNEL' ? 'bg-emerald-50' : 'bg-orange-50';
+            
             return (
-              <div key={f.id} onClick={() => setAppData(prev => ({ ...prev, currentId: f.id }))} className={`group relative flex flex-col p-3 rounded-xl border-2 transition-all cursor-pointer ${isActive ? `${typeColor} text-white shadow-md scale-[1.01]` : 'border-slate-100 bg-white hover:border-slate-200'}`}>
+              <div 
+                key={f.id}
+                onClick={() => setAppData(prev => ({ ...prev, currentId: f.id }))}
+                className={`group relative flex flex-col p-3 rounded-xl border-2 transition-all cursor-pointer overflow-hidden ${
+                  isActive 
+                  ? `${typeColor} text-white shadow-md scale-[1.01]` 
+                  : `border-slate-100 bg-white hover:border-slate-200`
+                }`}
+              >
                 <div className="flex items-center justify-between mb-1">
-                  <input type="text" value={f.name} onChange={(e) => { const newName = e.target.value; setAppData(prev => ({ ...prev, facilities: prev.facilities.map(fac => fac.id === f.id ? { ...fac, name: newName } : fac) })); }} onClick={(e) => e.stopPropagation()} className={`bg-transparent border-none text-[12px] font-black outline-none ${isActive ? 'text-white' : 'text-slate-800'}`} />
-                  <button onClick={(e) => { e.stopPropagation(); deleteFacility(f.id); }} className="opacity-0 group-hover:opacity-100"><X className="w-4 h-4" /></button>
+                  <input 
+                    type="text" 
+                    value={f.name} 
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      setAppData(prev => ({
+                        ...prev,
+                        facilities: prev.facilities.map(fac => fac.id === f.id ? { ...fac, name: newName } : fac)
+                      }));
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`bg-transparent border-none text-[12px] font-black focus:ring-0 p-0 w-full outline-none ${isActive ? 'text-white' : 'text-slate-800'}`}
+                  />
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); deleteFacility(f.id); }}
+                    className={`opacity-0 group-hover:opacity-100 transition-all ml-2 ${isActive ? 'text-white/60 hover:text-white' : 'text-slate-300 hover:text-red-500'}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md ${
+                    isActive ? 'bg-white/20 text-white' : `${typeLight} ${f.selectedType === 'BRIDGE' ? 'text-blue-700' : f.selectedType === 'TUNNEL' ? 'text-emerald-700' : 'text-orange-700'}`
+                  }`}>
+                    {STRUCTURE_INFO[f.selectedType].name}
+                  </span>
+                  <span className={`text-[8px] font-bold ${isActive ? 'text-white/70' : 'text-slate-400'}`}>
+                    {INSPECTION_INFO[f.inspectionType].name}
+                  </span>
                 </div>
               </div>
             );
@@ -254,23 +392,78 @@ export default function App() {
         </div>
       </div>
 
+      {/* Column 3: Main Content Area */}
       <main className="flex-1 overflow-y-auto p-4 md:p-10 print:p-0">
         <div className="max-w-5xl mx-auto space-y-8">
-          <div className="bg-white rounded-[32px] border border-slate-200 p-8 md:p-10 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="flex items-center gap-6 w-full">
-              <div className={`w-16 h-16 ${getThemeColor(activeFacility.selectedType)} rounded-[22px] flex items-center justify-center text-white shrink-0`}><Calculator className="w-8 h-8" /></div>
-              <div className="flex-1 min-w-0">
-                <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight truncate">{activeFacility.name}</h1>
-                <p className="text-sm text-slate-500 font-bold mt-1">국토안전관리원 세부지침 최신 기준 적용 중</p>
+          {/* Header Card */}
+          <div className="bg-white rounded-[32px] border border-slate-200 p-8 md:p-10 shadow-xl shadow-slate-200/40 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden print:border-none print:shadow-none">
+            <div className={`absolute top-0 right-0 w-80 h-80 ${getThemeColor(activeFacility.selectedType)} rounded-full -mr-40 -mt-40 opacity-5 print:hidden`}></div>
+            <div className="flex items-center gap-6 relative z-10 w-full">
+              <div className={`w-16 h-16 ${getThemeColor(activeFacility.selectedType)} rounded-[22px] flex items-center justify-center shadow-xl text-white shrink-0 transition-colors duration-500`}>
+                <Calculator className="w-8 h-8" />
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <div className={`px-4 py-2 ${getThemeColor(activeFacility.selectedType)} text-white rounded-2xl text-lg font-black whitespace-nowrap`}>{STRUCTURE_INFO[activeFacility.selectedType].name}</div>
-                <div className="px-4 py-2 bg-slate-100 text-slate-700 rounded-2xl text-lg font-black whitespace-nowrap">{INSPECTION_INFO[activeFacility.inspectionType].name}</div>
+              <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight truncate">{activeFacility.name}</h1>
+                  <p className="text-sm text-slate-500 font-bold mt-1 flex items-center gap-2 whitespace-nowrap">
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    국토안전관리원 세부지침 최신 기준 적용 중
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className={`px-4 py-2 ${getThemeColor(activeFacility.selectedType)} text-white rounded-2xl text-lg font-black shadow-md transition-colors duration-500 whitespace-nowrap`}>
+                    {STRUCTURE_INFO[activeFacility.selectedType].name}
+                  </div>
+                  <div className="px-4 py-2 bg-slate-100 text-slate-700 rounded-2xl text-lg font-black border border-slate-200 shadow-sm whitespace-nowrap">
+                    {INSPECTION_INFO[activeFacility.inspectionType].name}
+                  </div>
+                </div>
               </div>
             </div>
-            <button onClick={downloadExcel} className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-[20px] text-sm font-black hover:bg-green-700 transition-all shadow-lg shrink-0"><FileSpreadsheet className="w-4 h-4" /> 엑셀 다운로드</button>
+          <button 
+  onClick={() => {
+    const tableData = TEST_RULES[activeFacility.selectedType].map(rule => {
+      const res = rule.calculate(activeFacility);
+      const valU = activeFacility.implQtys[rule.id]?.upper ?? res.upperQty;
+      const valL = activeFacility.implQtys[rule.id]?.lower ?? res.lowerQty;
+      return { 
+        '시험 항목': rule.name, 
+        '비고': REMARKS_MAP[rule.id] || '지침 기준 준수', 
+        '수량(기준)': `${res.upperQty}/${res.lowerQty}`, 
+        '수량(금회)': `${valU}/${valL}` 
+      };
+    });
+    const worksheet = XLSX.utils.json_to_sheet(tableData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '수량산출');
+    XLSX.writeFile(workbook, `${activeFacility.name}_수량산출.xlsx`);
+  }}
+  className="flex items-center gap-3 px-8 py-4 bg-green-600 text-white rounded-[24px] text-base font-black hover:bg-green-700 transition-all shadow-2xl hover:shadow-green-200/50 active:scale-95 relative z-10 shrink-0"
+>
+  <FileSpreadsheet className="w-5 h-5" /> 엑셀 다운로드
+</button>
           </div>
-          <div className="bg-white rounded-[32px] border border-slate-200 shadow-xl overflow-hidden">
+
+          {/* Quick Stats Banner */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+              <div className={`w-10 h-10 ${getThemeLightColor(activeFacility.selectedType)} rounded-xl flex items-center justify-center`}><Construction className="w-5 h-5" /></div>
+              <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">총 연장</p><p className="text-lg font-black">{totalLength.toLocaleString()}m</p></div>
+            </div>
+            {isBridge && (
+              <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+                <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center"><Layers className="w-5 h-5" /></div>
+                <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">총 경간수</p><p className="text-lg font-black">{totalSpans}경간</p></div>
+              </div>
+            )}
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+              <div className="w-10 h-10 bg-slate-50 text-slate-600 rounded-xl flex items-center justify-center"><Info className="w-5 h-5" /></div>
+              <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">시설물 종별</p><p className="text-lg font-black">{FACILITY_CLASS_INFO[activeFacility.facilityClass]}</p></div>
+            </div>
+          </div>
+
+          {/* Results Table Card */}
+          <div className="bg-white rounded-[32px] border border-slate-200 shadow-xl overflow-hidden print:border-slate-300 print:shadow-none">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left min-w-[900px] table-fixed">
                 <thead>
@@ -280,23 +473,70 @@ export default function App() {
                     <th colSpan={2} className="p-4 border-r border-slate-200 font-black text-indigo-600 text-[11px] text-center uppercase tracking-wider">수량 산출 (기준 / 금회)</th>
                     <th rowSpan={2} className="p-4 font-black text-slate-700 text-[11px] w-[140px] text-center uppercase tracking-wider">비 고</th>
                   </tr>
+                  <tr className="bg-slate-50/30 border-b border-slate-200">
+                    {isBridge ? (
+                      <>
+                        <th className="p-3 border-r border-slate-200 font-bold text-slate-500 text-[10px] text-center">상부구조</th>
+                        <th className="p-3 border-r border-slate-200 font-bold text-slate-500 text-[10px] text-center">하부구조</th>
+                        <th className="p-3 border-r border-slate-200 font-bold text-indigo-600 text-[10px] text-center bg-indigo-50/30">상부 (기준/금회)</th>
+                        <th className="p-3 border-r border-slate-200 font-bold text-indigo-600 text-[10px] text-center bg-indigo-50/30">하부 (기준/금회)</th>
+                      </>
+                    ) : (
+                      <>
+                        <th colSpan={2} className="p-3 border-r border-slate-200 font-bold text-slate-500 text-[10px] text-center">산정 기준</th>
+                        <th colSpan={2} className="p-3 border-r border-slate-200 font-bold text-indigo-600 text-[10px] text-center bg-indigo-50/30">수량 산출 (기준 / 금회)</th>
+                      </>
+                    )}
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {TEST_RULES[activeFacility.selectedType].map(rule => {
+                  <tr className="bg-slate-50/80">
+                    <td colSpan={isBridge ? 6 : 4} className="p-3 px-6 text-[11px] font-black text-slate-600 flex items-center gap-2">
+                      <div className={`w-1.5 h-1.5 ${getThemeColor(activeFacility.selectedType)} rounded-full`}></div> 필수 과업 항목
+                    </td>
+                  </tr>
+                  {TEST_RULES[activeFacility.selectedType].filter(r => getCategory(r.id, activeFacility) === 'BASIC').map(rule => {
                     const res = rule.calculate(activeFacility);
                     const valU = activeFacility.implQtys[rule.id]?.upper ?? res.upperQty;
                     const valL = activeFacility.implQtys[rule.id]?.lower ?? res.lowerQty;
                     return (
-                      <tr key={rule.id} className="hover:bg-indigo-50/10 transition-colors">
-                        <td className="p-4 border-r border-slate-200 font-bold text-slate-900 text-[11px] text-center">{rule.name}</td>
-                        <td colSpan={2} className="p-3 border-r border-slate-200 text-[10px] text-slate-500 text-center">{res.upperCriteria || '-'}</td>
-                        <td colSpan={2} className="p-3 border-r border-slate-200 text-center bg-indigo-50/10">
-                          <div className="flex items-center justify-center gap-2">
-                            <span className="text-slate-400 font-medium text-[11px]">{res.upperQty}</span>
-                            <input type="text" value={valU} onChange={(e) => updateImplQty(rule.id, 'upper', e.target.value)} className="w-14 bg-white border border-indigo-100 rounded-lg text-center text-[11px] font-black text-indigo-600" />
-                          </div>
+                      <tr key={rule.id} className="hover:bg-indigo-50/10 transition-colors group">
+                        <td className="p-4 border-r border-slate-200 font-bold text-slate-900 text-[11px] text-center group-hover:text-indigo-600 transition-colors">{rule.name}</td>
+                        {isBridge ? (
+                          <>
+                            <td className="p-3 border-r border-slate-200 text-[10px] text-slate-500 text-center whitespace-pre-line leading-relaxed">{res.upperCriteria || '-'}</td>
+                            <td className="p-3 border-r border-slate-200 text-[10px] text-slate-500 text-center whitespace-pre-line leading-relaxed">{res.lowerCriteria || '-'}</td>
+                            <td className="p-3 border-r border-slate-200 text-center bg-indigo-50/10">
+                              <div className="flex items-center justify-center gap-2">
+                                <span className="text-slate-400 font-medium text-[11px]">{res.upperQty}</span>
+                                <span className="text-slate-200 text-[10px]">|</span>
+                                <input type="text" value={valU} onChange={(e) => updateImplQty(rule.id, 'upper', e.target.value)} className="w-14 bg-white border border-indigo-100 rounded-lg text-center text-[11px] font-black text-indigo-600 shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none print:bg-transparent print:border-none print:shadow-none" />
+                              </div>
+                            </td>
+                            <td className="p-3 border-r border-slate-200 text-center bg-indigo-50/10">
+                              <div className="flex items-center justify-center gap-2">
+                                <span className="text-slate-400 font-medium text-[11px]">{res.lowerQty}</span>
+                                <span className="text-slate-200 text-[10px]">|</span>
+                                <input type="text" value={valL} onChange={(e) => updateImplQty(rule.id, 'lower', e.target.value)} className="w-14 bg-white border border-indigo-100 rounded-lg text-center text-[11px] font-black text-indigo-600 shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none print:bg-transparent print:border-none print:shadow-none" />
+                              </div>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td colSpan={2} className="p-3 border-r border-slate-200 text-[10px] text-slate-500 text-center whitespace-pre-line leading-relaxed">{res.upperCriteria || '-'}</td>
+                            <td colSpan={2} className="p-3 border-r border-slate-200 text-center bg-indigo-50/10">
+                              <div className="flex items-center justify-center gap-2">
+                                <span className="text-slate-400 font-medium text-[11px]">{res.upperQty}</span>
+                                <span className="text-slate-200 text-[10px]">|</span>
+                                <input type="text" value={valU} onChange={(e) => updateImplQty(rule.id, 'upper', e.target.value)} className="w-14 bg-white border border-indigo-100 rounded-lg text-center text-[11px] font-black text-indigo-600 shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none print:bg-transparent print:border-none print:shadow-none" />
+                              </div>
+                            </td>
+                          </>
+                        )}
+                        {/* 비고란: REMARKS_MAP을 사용하여 지침서 내용 출력 */}
+                        <td className="p-3 text-[10px] text-slate-500 text-center font-medium italic">
+                          {REMARKS_MAP[rule.id] || '지침 기준 준수'}
                         </td>
-                        <td className="p-3 text-[10px] text-slate-500 text-center italic font-medium">{REMARKS_MAP[rule.id] || '지침 기준 준수'}</td>
                       </tr>
                     );
                   })}
