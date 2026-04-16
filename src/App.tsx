@@ -19,7 +19,8 @@ import {
   Info,
   LayoutDashboard,
   Layers
-} from 'lucide-react';import * as XLSX from 'xlsx'; //
+} from 'lucide-react'
+;import * as XLSX from 'xlsx'; //
 import { 
   Facility, 
   AppData, 
@@ -164,6 +165,23 @@ export default function App() {
     updateFacility({ implQtys: newImplQtys });
   };
 
+       const downloadExcel = () => {
+    const tableData = TEST_RULES[activeFacility.selectedType].map(rule => {
+      const res = rule.calculate(activeFacility);
+      const valU = activeFacility.implQtys[rule.id]?.upper ?? res.upperQty;
+      const valL = activeFacility.implQtys[rule.id]?.lower ?? res.lowerQty;
+      return { 
+        '시험 항목': rule.name, 
+        '비고': REMARKS_MAP[rule.id] || '지침 기준 준수', 
+        '수량(기준)': `${res.upperQty}/${res.lowerQty}`, 
+        '수량(금회)': `${valU}/${valL}` 
+      };
+    });
+    const worksheet = XLSX.utils.json_to_sheet(tableData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '수량산출');
+    XLSX.writeFile(workbook, `${activeFacility.name}_수량산출.xlsx`);
+  };
   const totalLength = useMemo(() => {
     if (activeFacility.selectedType === 'BRIDGE') {
       return activeFacility.bridgeSpans.reduce((acc, sp) => acc + (Number(sp.spanLength) || 0) * (Number(sp.spanCount) || 0), 0);
@@ -210,12 +228,12 @@ export default function App() {
               <p className="text-[9px] font-bold opacity-80">비파괴 검사 수량 산출 프로</p>
             </div>
           </div>
-          <button 
-            onClick={addFacility}
-            className="w-full py-2.5 bg-white text-slate-900 rounded-xl text-[11px] font-black shadow-lg hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 active:scale-[0.97]"
-          >
-            <Plus className="w-3.5 h-3.5" /> 새 시설물 추가하기
-          </button>
+<button 
+  onClick={downloadExcel} 
+  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black hover:bg-green-700 transition-all shadow-lg relative z-10 shrink-0 print:hidden"
+>
+  <FileSpreadsheet className="w-3.5 h-3.5" /> 엑셀 다운로드
+</button>
         </div>
 
         <div className="p-4 space-y-6">
