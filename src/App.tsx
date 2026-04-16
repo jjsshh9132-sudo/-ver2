@@ -17,16 +17,19 @@ import {
   BrickWall,
   ChevronRight,
   Info,
-  LayoutDashboard,
-  Layers
-} from 'lucide-react'
-;import * as XLSX from 'xlsx'; //
+  FileSpreadsheet
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import * as XLSX from 'xlsx';
 import { 
   Facility, 
   AppData, 
   StructureType, 
   InspectionType, 
-  FacilityClass
+  FacilityClass,
+  BridgeSpan,
+  TunnelSection,
+  RetainingWallSection
 } from './types';
 import { 
   STRUCTURE_INFO, 
@@ -36,7 +39,6 @@ import {
 } from './constants';
 import { TEST_RULES, getCategory } from './rules';
 
-// 비고란에 들어갈 지침서 기반 시험 방법 맵핑
 const REMARKS_MAP: Record<string, string> = {
   'CONC_STR': '반발경도법 등',
   'CARBON': '페놀프탈레인 용액법 등',
@@ -165,7 +167,7 @@ export default function App() {
     updateFacility({ implQtys: newImplQtys });
   };
 
-       const downloadExcel = () => {
+  const downloadExcel = () => {
     const tableData = TEST_RULES[activeFacility.selectedType].map(rule => {
       const res = rule.calculate(activeFacility);
       const valU = activeFacility.implQtys[rule.id]?.upper ?? res.upperQty;
@@ -228,12 +230,12 @@ export default function App() {
               <p className="text-[9px] font-bold opacity-80">비파괴 검사 수량 산출 프로</p>
             </div>
           </div>
-<button 
-  onClick={downloadExcel} 
-  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black hover:bg-green-700 transition-all shadow-lg relative z-10 shrink-0 print:hidden"
->
-  <FileSpreadsheet className="w-3.5 h-3.5" /> 엑셀 다운로드
-</button>
+            <button 
+              onClick={downloadExcel} 
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black hover:bg-green-700 transition-all shadow-lg relative z-10 shrink-0"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> 엑셀 다운로드
+            </button>
         </div>
 
         <div className="p-4 space-y-6">
