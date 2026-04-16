@@ -191,7 +191,49 @@ export default function App() {
               </select>
             </div>
           </section>
+          <section className="pt-2">
+            <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 px-1 tracking-widest">세부 제원 입력</label>
+            <div className="space-y-3">
+              {activeFacility.selectedType === 'BRIDGE' && (
+                <div className="space-y-2">
+                  {activeFacility.bridgeSpans.map((span, i) => (
+                    <div key={span.id} className="p-3 bg-white border border-slate-100 rounded-xl space-y-2 shadow-sm">
+                      <div className="flex items-center justify-between"><span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded uppercase">Span #{i+1}</span><button onClick={() => removeSection('bridgeSpans', span.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button></div>
+                      <select value={span.type} onChange={(e) => updateSection('bridgeSpans', span.id, 'type', e.target.value)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none">{BRIDGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                      <div className="grid grid-cols-2 gap-2"><div className="relative"><input type="number" value={span.spanLength} onChange={(e) => updateSection('bridgeSpans', span.id, 'spanLength', parseFloat(e.target.value) || 0)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-slate-400 font-bold">m</span></div><div className="relative"><input type="number" value={span.spanCount} onChange={(e) => updateSection('bridgeSpans', span.id, 'spanCount', parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-slate-400 font-bold">경간</span></div></div>
+                    </div>
+                  ))}
+                  <button onClick={() => addSection('bridgeSpans')} className="w-full py-2 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black border border-blue-100 hover:bg-blue-100 transition-all">+ 경간 그룹 추가</button>
+                </div>
+              )}
+              {activeFacility.selectedType === 'TUNNEL' && (
+                <div className="space-y-2">
+                  {activeFacility.tunnelSections.map((sec, i) => (
+                    <div key={sec.id} className="p-3 bg-white border border-slate-100 rounded-xl space-y-2 shadow-sm">
+                      <div className="flex items-center justify-between"><span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase">Section #{i+1}</span><button onClick={() => removeSection('tunnelSections', sec.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button></div>
+                      <div className="flex gap-1"><button onClick={() => updateSection('tunnelSections', sec.id, 'concreteType', 'REINFORCED')} className={`flex-1 py-1 rounded-lg text-[8px] font-black transition-all ${sec.concreteType === 'REINFORCED' ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-400'}`}>철근</button><button onClick={() => updateSection('tunnelSections', sec.id, 'concreteType', 'PLAIN')} className={`flex-1 py-1 rounded-lg text-[8px] font-black transition-all ${sec.concreteType === 'PLAIN' ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-400'}`}>무근</button></div>
+                      <div className="relative"><input type="number" value={sec.length} onChange={(e) => updateSection('tunnelSections', sec.id, 'length', parseFloat(e.target.value) || 0)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-slate-400 font-bold">m</span></div>
+                    </div>
+                  ))}
+                  <button onClick={() => addSection('tunnelSections')} className="w-full py-2 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black border border-emerald-100 hover:bg-emerald-100 transition-all">+ 섹션 추가</button>
+                </div>
+              )}
+              {activeFacility.selectedType === 'RETAINING_WALL' && (
+                <div className="space-y-2">
+                  {activeFacility.retainingWallSections.map((sec, i) => (
+                    <div key={sec.id} className="p-3 bg-white border border-slate-100 rounded-xl space-y-2 shadow-sm">
+                      <div className="flex items-center justify-between"><span className="text-[8px] font-black text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded uppercase">Section #{i+1}</span><button onClick={() => removeSection('retainingWallSections', sec.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button></div>
+                      <div className="grid grid-cols-3 gap-1">{(['CONCRETE', 'REINFORCED_SOIL', 'STONE'] as const).map(type => (<button key={type} onClick={() => updateSection('retainingWallSections', sec.id, 'type', type)} className={`py-1 rounded-lg text-[7px] font-black transition-all ${sec.type === type ? 'bg-orange-600 text-white' : 'bg-slate-50 text-slate-400'}`}>{type === 'CONCRETE' ? '콘크리트' : type === 'REINFORCED_SOIL' ? '보강토' : '석축'}</button>))}</div>
+                      <div className="relative"><input type="number" value={sec.length} onChange={(e) => updateSection('retainingWallSections', sec.id, 'length', parseFloat(e.target.value) || 0)} className="w-full bg-slate-50 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-slate-400 font-bold">m</span></div>
+                    </div>
+                  ))}
+                  <button onClick={() => addSection('retainingWallSections')} className="w-full py-2 bg-orange-50 text-orange-600 rounded-lg text-[9px] font-black border border-orange-100 hover:bg-orange-100 transition-all">+ 섹션 추가</button>
+                </div>
+              )}
+            </div>
+          </section>
         </div>
+        <div className="mt-auto p-4 border-t border-slate-50 bg-slate-50/30"><button onClick={resetData} className="w-full py-2 text-[9px] font-black text-slate-400 hover:text-red-500 transition-all flex items-center justify-center gap-1.5"><RotateCcw className="w-3 h-3" /> 데이터 초기화</button></div>
       </aside>
 
       <div className="w-full md:w-[280px] bg-slate-50/50 border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto no-scrollbar h-screen sticky top-0 z-20 print:hidden">
@@ -228,7 +270,40 @@ export default function App() {
             </div>
             <button onClick={downloadExcel} className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-[20px] text-sm font-black hover:bg-green-700 transition-all shadow-lg shrink-0"><FileSpreadsheet className="w-4 h-4" /> 엑셀 다운로드</button>
           </div>
-          {/* ... (테이블 등 나머지 코드는 이전과 동일) ... */}
+          <div className="bg-white rounded-[32px] border border-slate-200 shadow-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left min-w-[900px] table-fixed">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-200">
+                    <th rowSpan={2} className="p-4 border-r border-slate-200 font-black text-slate-700 text-[11px] w-[160px] text-center uppercase tracking-wider">시험 항목</th>
+                    <th colSpan={2} className="p-4 border-r border-slate-200 font-black text-slate-700 text-[11px] text-center uppercase tracking-wider">세부지침 기준</th>
+                    <th colSpan={2} className="p-4 border-r border-slate-200 font-black text-indigo-600 text-[11px] text-center uppercase tracking-wider">수량 산출 (기준 / 금회)</th>
+                    <th rowSpan={2} className="p-4 font-black text-slate-700 text-[11px] w-[140px] text-center uppercase tracking-wider">비 고</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {TEST_RULES[activeFacility.selectedType].map(rule => {
+                    const res = rule.calculate(activeFacility);
+                    const valU = activeFacility.implQtys[rule.id]?.upper ?? res.upperQty;
+                    const valL = activeFacility.implQtys[rule.id]?.lower ?? res.lowerQty;
+                    return (
+                      <tr key={rule.id} className="hover:bg-indigo-50/10 transition-colors">
+                        <td className="p-4 border-r border-slate-200 font-bold text-slate-900 text-[11px] text-center">{rule.name}</td>
+                        <td colSpan={2} className="p-3 border-r border-slate-200 text-[10px] text-slate-500 text-center">{res.upperCriteria || '-'}</td>
+                        <td colSpan={2} className="p-3 border-r border-slate-200 text-center bg-indigo-50/10">
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-slate-400 font-medium text-[11px]">{res.upperQty}</span>
+                            <input type="text" value={valU} onChange={(e) => updateImplQty(rule.id, 'upper', e.target.value)} className="w-14 bg-white border border-indigo-100 rounded-lg text-center text-[11px] font-black text-indigo-600" />
+                          </div>
+                        </td>
+                        <td className="p-3 text-[10px] text-slate-500 text-center italic font-medium">{REMARKS_MAP[rule.id] || '지침 기준 준수'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </main>
     </div>
