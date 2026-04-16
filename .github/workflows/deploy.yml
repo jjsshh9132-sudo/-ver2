@@ -1,7 +1,7 @@
 name: Deploy to GitHub Pages
 on:
   push:
-    branches: ["main"] # 사진에 '주요'라고 되어 있으므로 '주요'로 설정합니다.
+    branches: ["main"] # 사진에 'main'라고 되어 있으므로 'main'로 설정합니다.
   workflow_dispatch:
 permissions:
   contents: read
