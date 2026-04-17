@@ -39,6 +39,37 @@ import {
 } from './constants';
 import { TEST_RULES, getCategory } from './rules';
 
+const REMARKS_MAP: Record<string, string> = {
+  rebound: '지침 기준 준수',
+  ultrasonic: '현장 여건 고려',
+  rebar_scan: '현장 여건 고려',
+  carbonation: '지침 기준 준수',
+  chloride: '현장 여건 고려',
+  crack_depth: '현장 여건 고려',
+  steel_ut: '현장 여건 고려',
+  coating_thickness: '현장 여건 고려',
+  core_sampling: '현장 여건 고려',
+  underwater_survey: '현장 여건 고려',
+  load_test: '현장 여건 고려',
+  rebar_corrosion: '현장 여건 고려',
+  magnetic_particle: '현장 여건 고려',
+  radiographic: '현장 여건 고려',
+  clearance_survey: '현장 여건 고려',
+  survey_section: '지침 기준 준수',
+  cross_section: '지침 기준 준수',
+  luminance: '지침 기준 준수',
+  illuminance: '지침 기준 준수',
+  survey: '지침 기준 준수',
+  filling_concrete: '지침 기준 준수',
+  rock_weathering: '지침 기준 준수',
+  deformation_survey: '현장 여건 고려',
+  ground_survey: '현장 여건 고려',
+  groundwater: '현장 여건 고려',
+  inclinometer: '현장 여건 고려',
+  earth_pressure: '현장 여건 고려',
+  coating_thickness_wall: '현장 여건 고려'
+};
+
 const DEFAULT_FACILITY: Facility = {
   id: '1',
   name: '기본 시설물 1',
@@ -226,6 +257,9 @@ export default function App() {
           </div>
           <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
             {appData.facilities.map(f => {
+              const colorClass = f.selectedType === 'BRIDGE' ? 'bg-blue-500' :
+                              f.selectedType === 'TUNNEL' ? 'bg-emerald-500' :
+                              'bg-orange-500';
               const bgClass = f.selectedType === 'BRIDGE' ? 'bg-blue-50 border-blue-200' :
                               f.selectedType === 'TUNNEL' ? 'bg-emerald-50 border-emerald-200' :
                               'bg-orange-50 border-orange-200';
@@ -235,22 +269,25 @@ export default function App() {
                 onClick={() => setAppData(prev => ({ ...prev, currentId: f.id }))}
                 className={`group flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${appData.currentId === f.id ? bgClass : 'bg-white border-slate-100 hover:border-slate-200'}`}
               >
-                <input 
-                  type="text" 
-                  value={f.name} 
-                  onChange={(e) => {
-                    const newName = e.target.value;
-                    setAppData(prev => ({
-                      ...prev,
-                      facilities: prev.facilities.map(fac => fac.id === f.id ? { ...fac, name: newName } : fac)
-                    }));
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="bg-transparent border-none text-[11px] font-bold text-slate-700 focus:ring-0 p-0 w-full outline-none"
-                />
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${colorClass}`} />
+                  <input 
+                    type="text" 
+                    value={f.name} 
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      setAppData(prev => ({
+                        ...prev,
+                        facilities: prev.facilities.map(fac => fac.id === f.id ? { ...fac, name: newName } : fac)
+                      }));
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-transparent border-none text-[11px] font-bold text-slate-700 focus:ring-0 p-0 w-full outline-none"
+                  />
+                </div>
                 <button 
                   onClick={(e) => { e.stopPropagation(); deleteFacility(f.id); }}
-                  className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all ml-2"
+                  className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -538,10 +575,46 @@ export default function App() {
                       <ChevronRight className="w-3 h-3" /> 필수 과업
                     </td>
                   </tr>
-                  {TEST_RULES[activeFacility.selectedType].filter(r => getCategory(r.id, activeFacility) === 'BASIC').map(rule => {
+                    {TEST_RULES[activeFacility.selectedType].filter(r => getCategory(r.id, activeFacility) === 'BASIC').map(rule => {
                     const res = rule.calculate(activeFacility);
                     const valU = activeFacility.implQtys[rule.id]?.upper ?? res.upperQty;
                     const valL = activeFacility.implQtys[rule.id]?.lower ?? res.lowerQty;
+                    
+                    if (res.breakdown) {
+                      return (
+                        <React.Fragment key={rule.id}>
+                          <tr className="bg-slate-100 font-bold">
+                            <td className="p-3 border-r border-slate-200 text-[11px] text-center" colSpan={isBridge ? 6 : 4}>{rule.name} (합계)</td>
+                          </tr>
+                          {res.breakdown.map((b) => (
+                            <tr key={b.name} className="hover:bg-slate-50 transition-colors">
+                              <td className="p-3 border-r border-slate-200 text-[10px] text-slate-500 text-center">{rule.name} - {b.name}</td>
+                              {isBridge ? (
+                                <>
+                                  <td className="p-2 border-r border-slate-200 text-[10px] text-slate-500 text-center whitespace-pre-wrap">{res.upperCriteria || '-'}</td>
+                                  <td className="p-2 border-r border-slate-200 text-[10px] text-slate-500 text-center whitespace-pre-wrap">{res.lowerCriteria || '-'}</td>
+                                  <td className="p-2 border-r border-slate-200 text-center">
+                                    <div className="flex items-center justify-center gap-1.5"><span className="text-[11px]">{b.upperQty}</span></div>
+                                  </td>
+                                  <td className="p-2 border-r border-slate-200 text-center">
+                                    <div className="flex items-center justify-center gap-1.5 whitespace-nowrap"><span className="text-[11px]">{b.lowerQty}</span></div>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td colSpan={2} className="p-2 border-r border-slate-200 text-[10px] text-slate-500 text-center whitespace-pre-wrap">{res.upperCriteria || '-'}</td>
+                                  <td colSpan={2} className="p-2 border-r border-slate-200 text-center">
+                                    <div className="flex items-center justify-center gap-1.5 whitespace-nowrap"><span className="text-[11px]">{b.upperQty}</span></div>
+                                  </td>
+                                </>
+                              )}
+                              <td className="p-2 text-[10px] text-slate-400 text-center italic">지침 기준 준수</td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      );
+                    }
+
                     return (
                       <tr key={rule.id} className="hover:bg-slate-50 transition-colors">
                         <td className="p-3 border-r border-slate-200 font-bold text-slate-900 text-[11px] text-center">{rule.name}</td>
@@ -591,7 +664,7 @@ export default function App() {
                             </td>
                           </>
                         )}
-                        <td className="p-2 text-[10px] text-slate-400 text-center italic">지침 기준 준수</td>
+                        <td className="p-2 text-[10px] text-slate-400 text-center italic">{REMARKS_MAP[rule.id] || '지침 기준 준수'}</td>
                       </tr>
                     );
                   })}
