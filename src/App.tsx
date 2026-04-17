@@ -148,6 +148,20 @@ export default function App() {
     updateFacility({ implQtys: newImplQtys });
   };
 
+  // 1. 총합 계산 로직 추가
+  const totals = useMemo(() => {
+    let upperTotal = 0;
+    let lowerTotal = 0;
+    TEST_RULES[activeFacility.selectedType].forEach(rule => {
+      const res = rule.calculate(activeFacility);
+      const valU = parseFloat(activeFacility.implQtys[rule.id]?.upper ?? res.upperQty) || 0;
+      const valL = parseFloat(activeFacility.implQtys[rule.id]?.lower ?? res.lowerQty) || 0;
+      upperTotal += valU;
+      lowerTotal += valL;
+    });
+    return { upperTotal, lowerTotal };
+  }, [activeFacility]);
+
   const downloadExcel = () => {
     const tableData = TEST_RULES[activeFacility.selectedType].map(rule => {
       const res = rule.calculate(activeFacility);
@@ -211,11 +225,15 @@ export default function App() {
             </button>
           </div>
           <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
-            {appData.facilities.map(f => (
+            {appData.facilities.map(f => {
+              const bgClass = f.selectedType === 'BRIDGE' ? 'bg-blue-50 border-blue-200' :
+                              f.selectedType === 'TUNNEL' ? 'bg-emerald-50 border-emerald-200' :
+                              'bg-orange-50 border-orange-200';
+              return (
               <div 
                 key={f.id}
                 onClick={() => setAppData(prev => ({ ...prev, currentId: f.id }))}
-                className={`group flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${appData.currentId === f.id ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100 hover:border-slate-200'}`}
+                className={`group flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${appData.currentId === f.id ? bgClass : 'bg-white border-slate-100 hover:border-slate-200'}`}
               >
                 <input 
                   type="text" 
@@ -237,7 +255,7 @@ export default function App() {
                   <X className="w-3 h-3" />
                 </button>
               </div>
-            ))}
+            )})}
           </div>
         </div>
 
@@ -262,7 +280,7 @@ export default function App() {
           </section>
 
           <section className="space-y-4">
-            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">02. 기본 설정</label>
+            <label className="block text-[14px] font-black text-slate-500 uppercase mb-1 tracking-widest">02. 기본 설정</label>
             <div>
               <label className="block text-[9px] font-black text-slate-500 uppercase mb-1 ml-0.5">점검 종류</label>
               <select 
@@ -641,6 +659,13 @@ export default function App() {
                       </tr>
                     );
                   })}
+                  {/* Footer (Added Total Row) */}
+                  <tr className="bg-indigo-50 font-black">
+                    <td colSpan={isBridge ? 3 : 2} className="p-3 text-[12px] text-right text-indigo-700">총합</td>
+                    <td className="p-2 text-center text-[12px] text-indigo-900">{totals.upperTotal}</td>
+                    <td className="p-2 text-center text-[12px] text-indigo-900">{totals.lowerTotal}</td>
+                    <td className="p-2"></td>
+                  </tr>
                 </tbody>
               </table>
             </div>
