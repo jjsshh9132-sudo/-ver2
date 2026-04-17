@@ -17,8 +17,6 @@ import {
   BrickWall,
   ChevronRight,
   Info,
-  LayoutDashboard,
-  Layers,
   FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -40,24 +38,6 @@ import {
   BRIDGE_TYPES 
 } from './constants';
 import { TEST_RULES, getCategory } from './rules';
-
-const REMARKS_MAP: Record<string, string> = {
-  'CONC_STR': '반발경도법 등',
-  'CARBON': '페놀프탈레인 용액법 등',
-  'REBAR': '전자파법, 전자기유도법 등',
-  'CHLORIDE': '전위차적정법 등',
-  'STEEL_THICK': '초음파두께측정 등',
-  'PAINT_THICK': '도막두께측정 등',
-  'UT': '초음파탐상시험 등',
-  'MT': '자분탐상시험 등',
-  'PT': '침투탐상시험 등',
-  'SCOUR': '육안조사 및 장비측정 등',
-  'TUNNEL_THICK': '충격반향기법, GPR 등',
-  'TUNNEL_BACK': 'GPR 등',
-  'RW_STR': '반발경도법 등',
-  'RW_CARBON': '페놀프탈레인 용액법 등',
-  'RW_REBAR': '전자파법, 전자기유도법 등'
-};
 
 const DEFAULT_FACILITY: Facility = {
   id: '1',
@@ -167,7 +147,8 @@ export default function App() {
     newImplQtys[ruleId][type] = value;
     updateFacility({ implQtys: newImplQtys });
   };
-        const downloadExcel = () => {
+
+  const downloadExcel = () => {
     const tableData = TEST_RULES[activeFacility.selectedType].map(rule => {
       const res = rule.calculate(activeFacility);
       const valU = activeFacility.implQtys[rule.id]?.upper ?? res.upperQty;
@@ -253,7 +234,7 @@ export default function App() {
                   onClick={(e) => { e.stopPropagation(); deleteFacility(f.id); }}
                   className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all ml-2"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <X className="w-3 h-3" />
                 </button>
               </div>
             ))}
@@ -497,33 +478,11 @@ export default function App() {
                 </div>
               </div>
             </div>
-<button 
-  onClick={downloadExcel} 
-  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black hover:bg-green-700 transition-all shadow-lg relative z-10 shrink-0"
->
-  <FileSpreadsheet className="w-3.5 h-3.5" /> 엑셀 다운로드
-</button>
             <button 
-              onClick={() => {
-                const tableData = TEST_RULES[activeFacility.selectedType].map(rule => {
-                  const res = rule.calculate(activeFacility);
-                  const valU = activeFacility.implQtys[rule.id]?.upper ?? res.upperQty;
-                  const valL = activeFacility.implQtys[rule.id]?.lower ?? res.lowerQty;
-                  return { 
-                    '시험 항목': rule.name, 
-                    '비고': REMARKS_MAP[rule.id] || '지침 기준 준수', 
-                    '수량(기준)': `${res.upperQty}/${res.lowerQty}`, 
-                    '수량(금회)': `${valU}/${valL}` 
-                  };
-                });
-                const worksheet = XLSX.utils.json_to_sheet(tableData);
-                const workbook = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(workbook, worksheet, '수량산출');
-                XLSX.writeFile(workbook, `${activeFacility.name}_수량산출.xlsx`);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black hover:bg-green-700 transition-all shadow-lg relative z-10 shrink-0"
+              onClick={downloadExcel} 
+              className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl text-sm font-black hover:bg-green-700 transition-all shadow-lg relative z-10 shrink-0"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" /> 엑셀 다운로드
+              <FileSpreadsheet className="w-4 h-4" /> 엑셀 다운로드
             </button>
           </div>
 
@@ -533,23 +492,23 @@ export default function App() {
               <table className="w-full border-collapse text-left min-w-[900px] table-fixed">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    <th rowSpan={2} className="p-3 border-r border-slate-200 font-black text-slate-700 text-[10px] w-[140px] text-center">시험 항목</th>
-                    <th colSpan={2} className="p-3 border-r border-slate-200 font-black text-slate-700 text-[10px] text-center">세부지침 기준</th>
-                    <th colSpan={2} className="p-3 border-r border-slate-200 font-black text-indigo-600 text-[10px] text-center">수량 산출 (기준 / 금회)</th>
-                    <th rowSpan={2} className="p-3 font-black text-slate-700 text-[10px] w-[120px] text-center">비 고</th>
+                    <th rowSpan={2} className="p-3 border-r border-slate-200 font-black text-slate-700 text-[11px] w-[140px] text-center">시험 항목</th>
+                    <th colSpan={2} className="p-3 border-r border-slate-200 font-black text-slate-700 text-[11px] text-center">세부지침 기준</th>
+                    <th colSpan={2} className="p-3 border-r border-slate-200 font-black text-indigo-600 text-[11px] text-center">수량 산출 (기준 / 금회)</th>
+                    <th rowSpan={2} className="p-3 font-black text-slate-700 text-[11px] w-[120px] text-center">비 고</th>
                   </tr>
                   <tr className="bg-slate-50 border-b border-slate-200">
                     {isBridge ? (
                       <>
-                        <th className="p-2 border-r border-slate-200 font-bold text-slate-500 text-[10px] text-center">상부구조</th>
-                        <th className="p-2 border-r border-slate-200 font-bold text-slate-500 text-[10px] text-center">하부구조</th>
-                        <th className="p-2 border-r border-slate-200 font-bold text-indigo-600 text-[10px] text-center">상부 (기준/금회)</th>
-                        <th className="p-2 border-r border-slate-200 font-bold text-indigo-600 text-[10px] text-center">하부 (기준/금회)</th>
+                        <th className="p-2 border-r border-slate-200 font-bold text-slate-500 text-[11px] text-center">상부구조</th>
+                        <th className="p-2 border-r border-slate-200 font-bold text-slate-500 text-[11px] text-center">하부구조</th>
+                        <th className="p-2 border-r border-slate-200 font-bold text-indigo-600 text-[11px] text-center">상부 (기준/금회)</th>
+                        <th className="p-2 border-r border-slate-200 font-bold text-indigo-600 text-[11px] text-center">하부 (기준/금회)</th>
                       </>
                     ) : (
                       <>
-                        <th colSpan={2} className="p-2 border-r border-slate-200 font-bold text-slate-500 text-[10px] text-center">산정 기준</th>
-                        <th colSpan={2} className="p-2 border-r border-slate-200 font-bold text-indigo-600 text-[10px] text-center">수량 산출 (기준 / 금회)</th>
+                        <th colSpan={2} className="p-2 border-r border-slate-200 font-bold text-slate-500 text-[11px] text-center">산정 기준</th>
+                        <th colSpan={2} className="p-2 border-r border-slate-200 font-bold text-indigo-600 text-[11px] text-center">수량 산출 (기준 / 금회)</th>
                       </>
                     )}
                   </tr>
@@ -557,7 +516,7 @@ export default function App() {
                 <tbody className="divide-y divide-slate-100">
                   {/* Basic Tasks */}
                   <tr className="bg-slate-50/80">
-                    <td colSpan={isBridge ? 6 : 4} className="p-2.5 px-4 text-[10px] font-black text-slate-500 flex items-center gap-2">
+                    <td colSpan={isBridge ? 6 : 4} className="p-2.5 px-4 text-[11px] font-black text-slate-500 flex items-center gap-2">
                       <ChevronRight className="w-3 h-3" /> 필수 과업
                     </td>
                   </tr>
@@ -567,11 +526,11 @@ export default function App() {
                     const valL = activeFacility.implQtys[rule.id]?.lower ?? res.lowerQty;
                     return (
                       <tr key={rule.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-3 border-r border-slate-200 font-bold text-slate-900 text-[10px] text-center">{rule.name}</td>
+                        <td className="p-3 border-r border-slate-200 font-bold text-slate-900 text-[11px] text-center">{rule.name}</td>
                         {isBridge ? (
                           <>
-                            <td className="p-2 border-r border-slate-200 text-[9px] text-slate-500 text-center whitespace-pre-line">{res.upperCriteria || '-'}</td>
-                            <td className="p-2 border-r border-slate-200 text-[9px] text-slate-500 text-center whitespace-pre-line">{res.lowerCriteria || '-'}</td>
+                            <td className="p-2 border-r border-slate-200 text-[10px] text-slate-500 text-center whitespace-pre-wrap">{res.upperCriteria || '-'}</td>
+                            <td className="p-2 border-r border-slate-200 text-[10px] text-slate-500 text-center whitespace-pre-wrap">{res.lowerCriteria || '-'}</td>
                             <td className="p-2 border-r border-slate-200 text-center">
                               <div className="flex items-center justify-center gap-1.5">
                                 <span className="text-slate-900 font-normal text-[11px]">{res.upperQty}</span>
@@ -580,41 +539,41 @@ export default function App() {
                                   type="text" 
                                   value={valU} 
                                   onChange={(e) => updateImplQty(rule.id, 'upper', e.target.value)}
-                                  className="w-12 bg-blue-50 border border-blue-100 rounded text-center text-[10px] font-bold text-blue-600 outline-none print:bg-transparent print:border-none"
+                                  className="w-16 bg-blue-50 border border-blue-100 rounded text-center text-[11px] font-bold text-blue-600 outline-none"
                                 />
                               </div>
                             </td>
                             <td className="p-2 border-r border-slate-200 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
+                              <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
                                 <span className="text-slate-900 font-normal text-[11px]">{res.lowerQty}</span>
                                 <span className="text-slate-300 text-[10px]">/</span>
                                 <input 
                                   type="text" 
                                   value={valL} 
                                   onChange={(e) => updateImplQty(rule.id, 'lower', e.target.value)}
-                                  className="w-12 bg-blue-50 border border-blue-100 rounded text-center text-[10px] font-bold text-blue-600 outline-none print:bg-transparent print:border-none"
+                                  className="w-16 bg-blue-50 border border-blue-100 rounded text-center text-[11px] font-bold text-blue-600 outline-none"
                                 />
                               </div>
                             </td>
                           </>
                         ) : (
                           <>
-                            <td colSpan={2} className="p-2 border-r border-slate-200 text-[9px] text-slate-500 text-center whitespace-pre-line">{res.upperCriteria || '-'}</td>
+                            <td colSpan={2} className="p-2 border-r border-slate-200 text-[10px] text-slate-500 text-center whitespace-pre-wrap">{res.upperCriteria || '-'}</td>
                             <td colSpan={2} className="p-2 border-r border-slate-200 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
+                              <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
                                 <span className="text-slate-900 font-normal text-[11px]">{res.upperQty}</span>
                                 <span className="text-slate-300 text-[10px]">/</span>
                                 <input 
                                   type="text" 
                                   value={valU} 
                                   onChange={(e) => updateImplQty(rule.id, 'upper', e.target.value)}
-                                  className="w-12 bg-blue-50 border border-blue-100 rounded text-center text-[10px] font-bold text-blue-600 outline-none print:bg-transparent print:border-none"
+                                  className="w-16 bg-blue-50 border border-blue-100 rounded text-center text-[11px] font-bold text-blue-600 outline-none"
                                 />
                               </div>
                             </td>
                           </>
                         )}
-                        <td className="p-2 text-[9px] text-slate-400 text-center italic">지침 기준 준수</td>
+                        <td className="p-2 text-[10px] text-slate-400 text-center italic">지침 기준 준수</td>
                       </tr>
                     );
                   })}
