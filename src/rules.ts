@@ -8,6 +8,7 @@ export interface TestResult {
   lowerQty: string | number;
   upperCriteria: string;
   lowerCriteria: string;
+  breakdown?: Array<{ name: string, upperQty: number, lowerQty: number }>;
 }
 
 export const getCategory = (ruleId: string, s: Facility): 'BASIC' | 'OPTIONAL' => {
@@ -58,11 +59,26 @@ export const TEST_RULES: Record<string, Array<{ id: string; name: string; calcul
     { id: 'rebound', name: '반발경도시험', calculate: (s) => {
       const isD = s.inspectionType === 'DETAILED_DIAGNOSIS' || s.inspectionType === 'PERFORMANCE_EVAL_1';
       const spans = s.bridgeSpans || [];
-      const totalL = spans.reduce((acc, sp) => acc + (sp.spanLength || 0) * (sp.spanCount || 0), 0);
-      const r = getAdjustmentRatio(totalL);
-      const uQty = Math.ceil(calcByLength(totalL, 50) * (isD ? 2 : 1) * r);
-      const lQty = Math.ceil(calcByLength(totalL, 50) * r);
-      return { upperQty: uQty, lowerQty: lQty, upperCriteria: isD ? 'RC: 2개소/50m, 강재: 1개소/50m' : '1개소/50m', lowerCriteria: '1개소/연장 50m' };
+      
+      const breakdown = spans.reduce((acc, span) => {
+        const type = span.type;
+        const len = (span.spanLength || 0) * (span.spanCount || 0);
+        if (!acc[type]) acc[type] = 0;
+        acc[type] += len;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const subResults = Object.entries(breakdown).map(([type, totalL]) => {
+        const r = getAdjustmentRatio(totalL);
+        const uQty = Math.ceil(calcByLength(totalL, 50) * (isD ? 2 : 1) * r);
+        const lQty = Math.ceil(calcByLength(totalL, 50) * r);
+        return { name: type, upperQty: uQty, lowerQty: lQty };
+      });
+      
+      const totalU = subResults.reduce((a, b) => a + b.upperQty, 0);
+      const totalL = subResults.reduce((a, b) => a + b.lowerQty, 0);
+      
+      return { upperQty: totalU, lowerQty: totalL, upperCriteria: isD ? 'RC: 2개소/50m, 강재: 1개소/50m' : '1개소/50m', lowerCriteria: '1개소/연장 50m', breakdown: subResults };
     }},
     { id: 'ultrasonic', name: '초음파법(비파괴)', calculate: (s) => {
       const isD = s.inspectionType === 'DETAILED_DIAGNOSIS' || s.inspectionType === 'PERFORMANCE_EVAL_1';
